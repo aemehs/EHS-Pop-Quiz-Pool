@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safety & Health Pop Quiz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Add Tone.js for Sound Effects and QRCode.js for Mobile Scanning -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Montserrat', 'sans-serif'],
+                    },
+                    colors: {
+                        kRed: '#e21b3c',
+                        kBlue: '#1368ce',
+                        kYellow: '#d89e00',
+                        kGreen: '#26890c',
+                        kBg: '#f2f2f2',
+                        kDark: '#333333'
+                    },
+                    boxShadow: {
+                        'k-btn': '0 4px 0 rgba(0,0,0,0.2)',
+                        'k-btn-active': '0 0px 0 rgba(0,0,0,0.2)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #f2f2f2;
+            overflow-x: hidden;
+            touch-action: manipulation;
+        }
+        
+        /* Kahoot Style Shapes */
+        .shape-triangle {
+            width: 0; height: 0;
+            border-left: 12px solid transparent;
+            border-right: 12px solid transparent;
+            border-bottom: 20px solid white;
+        }
+        .shape-diamond {
+            width: 16px; height: 16px;
+            background: white;
+            transform: rotate(45deg);
+        }
+        .shape-circle {
+            width: 20px; height: 20px;
+            background: white;
+            border-radius: 50%;
+        }
+        .shape-square {
+            width: 18px; height: 18px;
+            background: white;
+        }
+
+        .answer-btn {
+            transition: transform 0.1s, filter 0.1s;
+        }
+        .answer-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0px 0 rgba(0,0,0,0.2);
+        }
+        .answer-btn:hover {
+            filter: brightness(1.1);
+        }
+
+        /* Animations */
+        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        .slide-up { animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .pulse-fast { animation: pulseFast 0.5s infinite alternate; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(40px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulseFast {
+            from { transform: scale(1); }
+            to { transform: scale(1.05); }
+        }
+
+        /* Timer Bar Transition */
+        #timer-bar {
+            transition: width 1s linear, background-color 0.3s ease;
+        }
+    </style>
+</head>
+<body class="text-kDark flex flex-col min-h-screen">
+
+    <!-- Offline / Cloud Status Banner -->
+    <div id="offline-banner" class="hidden bg-amber-100 text-amber-800 px-4 py-2 text-center text-sm font-medium border-b border-amber-200 z-50 w-full relative">
+        ⚠️ <strong>Offline Mode:</strong> Running locally. Cloud sync requires hosting on a live server environment.
+    </div>
+
+    <!-- Top Navigation Bar -->
+    <nav class="bg-white shadow-md p-4 flex justify-between items-center z-10 relative">
+        <div class="font-black text-2xl tracking-tighter flex items-center gap-2">
+            <span class="text-kRed">Safety</span><span class="text-kBlue">Quiz</span><span class="text-kYellow">!</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="exportReport()" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-1.5 px-3 rounded-full transition-colors flex items-center gap-1" title="Export Results to CSV">
+                <span>📥</span> Report
+            </button>
+            <div class="hidden id-score-display bg-kDark text-white px-4 py-1.5 rounded-full font-bold text-sm">
+                Score: <span id="nav-score">0</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="flex-grow flex flex-col relative w-full h-full" id="app-container">
+        
+        <!-- 1. HOME SCREEN -->
+        <div id="screen-home" class="flex-grow flex flex-col items-center justify-center p-6 slide-up w-full max-w-2xl mx-auto text-center">
+            <div class="bg-white p-8 rounded-2xl shadow-xl w-full border-b-8 border-gray-200">
+                <div class="text-6xl mb-4">🦺</div>
+                <h1 class="text-3xl md:text-5xl font-black mb-4 text-kDark tracking-tight">Workplace Safety & Health Challenge</h1>
+                <p class="text-gray-500 font-medium mb-8">20 Questions. 20 Seconds each. The faster you answer, the higher your score!</p>
+                
+                <div class="w-full max-w-xs mx-auto">
+                    <input type="text" id="player-id" placeholder="Employee ID" class="w-full text-center text-xl font-bold p-4 border-2 border-gray-300 rounded-xl mb-3 focus:outline-none focus:border-kBlue focus:ring-4 focus:ring-blue-100 transition-all">
+                    <input type="text" id="player-name" placeholder="Enter Nickname" class="w-full text-center text-xl font-bold p-4 border-2 border-gray-300 rounded-xl mb-4 focus:outline-none focus:border-kBlue focus:ring-4 focus:ring-blue-100 transition-all">
+                    <button onclick="startGame()" class="w-full bg-kDark hover:bg-black text-white font-black text-2xl py-4 rounded-xl shadow-k-btn hover:shadow-none hover:translate-y-1 transition-all">
+                        Enter
+                    </button>
+                </div>
+
+                <!-- Dynamic QR Code Section -->
+                <div class="mt-8 pt-6 border-t border-gray-100 flex flex-col items-center">
+                    <p class="text-xs font-bold text-gray-400 mb-3 uppercase tracking-widest">Or scan to join on mobile</p>
+                    <div id="qrcode" class="p-2 bg-white rounded-xl shadow-sm border border-gray-200"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. GET READY SCREEN -->
+        <div id="screen-ready" class="hidden flex-grow flex flex-col items-center justify-center p-6 w-full">
+            <h2 class="text-5xl md:text-7xl font-black text-kDark mb-2" id="ready-text">Ready...</h2>
+            <div class="text-kBlue font-bold text-xl mt-4 animate-pulse">Loading Question...</div>
+        </div>
+
+        <!-- 3. QUESTION SCREEN -->
+        <div id="screen-game" class="hidden flex-grow flex flex-col w-full max-w-5xl mx-auto p-4 md:p-6 fade-in h-full">
+            
+            <!-- Question Header -->
+            <div class="bg-white rounded-xl shadow-md p-6 md:p-10 mb-6 text-center border-b-4 border-gray-200 min-h-[160px] flex items-center justify-center relative">
+                <div class="absolute top-4 left-4 bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-sm font-bold">
+                    <span id="q-current">1</span> of <span id="q-total">20</span>
+                </div>
+                <h2 class="text-2xl md:text-4xl font-bold leading-tight" id="question-text">Question goes here?</h2>
+            </div>
+
+            <!-- Image Placeholder (Optional) -->
+            <div class="flex-grow flex items-center justify-center mb-6">
+                <div class="relative w-24 h-24 md:w-32 md:h-32 bg-gray-200 rounded-full flex items-center justify-center shadow-inner border-4 border-white">
+                    <span class="text-4xl md:text-5xl font-black text-gray-400" id="timer-text">20</span>
+                    <!-- Circular progress ring could go here -->
+                </div>
+            </div>
+
+            <!-- Answers Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 w-full mt-auto pb-4" id="answers-grid">
+                <!-- Buttons injected via JS -->
+            </div>
+            
+            <!-- Timer Bar -->
+            <div class="w-full bg-gray-300 h-2 md:h-3 rounded-full overflow-hidden mt-2">
+                <div id="timer-bar" class="h-full bg-kBlue w-full"></div>
+            </div>
+        </div>
+
+        <!-- 4. FEEDBACK SCREEN (Correct/Incorrect) -->
+        <div id="screen-feedback" class="hidden flex-grow flex flex-col items-center justify-center p-6 w-full text-white transition-colors duration-300">
+            <div class="text-8xl mb-4" id="feedback-icon">✔️</div>
+            <h2 class="text-5xl md:text-6xl font-black mb-2 shadow-sm" id="feedback-title">Correct!</h2>
+            <div class="bg-black/20 px-6 py-2 rounded-full font-bold text-xl mb-8 flex items-center gap-2">
+                <span id="feedback-points">+ 850</span> points
+            </div>
+            
+            <div class="bg-white text-kDark p-6 rounded-xl shadow-lg w-full max-w-2xl text-center mb-8 border-b-4 border-gray-300">
+                <p class="text-sm text-gray-500 font-bold uppercase mb-1">Correct Answer Was:</p>
+                <p class="text-xl font-bold" id="feedback-correct-answer">The answer</p>
+                <div id="feedback-explanation" class="mt-4 pt-4 border-t border-gray-100 text-gray-600 text-sm font-medium">
+                    Explanation goes here.
+                </div>
+            </div>
+
+            <button onclick="nextQuestion()" class="bg-kDark hover:bg-black text-white font-black text-xl py-4 px-12 rounded-xl shadow-k-btn hover:translate-y-1 transition-all">
+                Next
+            </button>
+        </div>
+
+        <!-- 5. PODIUM SCREEN -->
+        <div id="screen-podium" class="hidden flex-grow flex flex-col items-center justify-center p-4 md:p-6 slide-up w-full text-center overflow-y-auto">
+            <h2 class="text-4xl md:text-5xl font-black text-kDark mb-2 mt-8">Final Score</h2>
+            <p class="text-gray-500 font-bold mb-6 text-xl" id="podium-name">Player</p>
+            
+            <div class="bg-kBlue text-white p-6 rounded-2xl shadow-xl w-full max-w-md border-b-8 border-blue-800 mb-6 transform hover:scale-105 transition-transform flex flex-col items-center">
+                <div class="text-6xl mb-2">🏆</div>
+                <div class="text-5xl font-black mb-1" id="podium-score">0</div>
+                <div class="text-blue-200 font-bold uppercase tracking-widest text-xs">Total Points</div>
+            </div>
+
+            <div class="text-lg font-bold text-gray-700 mb-6 max-w-lg" id="podium-message">
+                Great job! You are a safety champion.
+            </div>
+
+            <!-- Live Leaderboard Container -->
+            <div class="w-full max-w-md bg-white rounded-xl shadow-md p-6 mb-8 border border-gray-200">
+                <h3 class="font-black text-xl mb-4 text-kDark border-b-2 border-gray-100 pb-2 flex items-center justify-center gap-2">
+                    <span>🌍</span> Live Leaderboard
+                </h3>
+                <ul id="live-leaderboard" class="text-left space-y-3">
+                    <li class="text-gray-500 text-center py-4 font-bold">Loading scores...</li>
+                </ul>
+            </div>
+
+            <button onclick="playAgain()" class="bg-white border-2 border-gray-300 hover:border-kBlue text-gray-700 font-bold text-lg py-3 px-8 rounded-xl shadow-sm hover:shadow-md transition-all mb-10">
+                Play Again
+            </button>
+        </div>
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Expose functions globally for HTML buttons
+        window.startGame = startGame;
+        window.submitAnswer = submitAnswer;
+        window.nextQuestion = nextQuestion;
+        window.playAgain = playAgain;
+        window.exportReport = exportReport;
+
+        const appId = 'safety-quiz-app';
+        const firebaseConfig = {
+            apiKey: "AIzaSyACpFRNhipROcAoEK_mXwWCXgMFZmfiTQ4",
+            authDomain: "ehs-pop-quiz.firebaseapp.com",
+            projectId: "ehs-pop-quiz",
+            storageBucket: "ehs-pop-quiz.firebasestorage.app",
+            messagingSenderId: "604622253067",
+            appId: "1:604622253067:web:fd7047ef122e501606eb0e",
+            measurementId: "G-WDGPEYES0J"
+        };
+        
+        const isCloudEnabled = window.location.protocol.startsWith('http');
+        let app, auth, db = null;
+
+        if (isCloudEnabled) {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            signInAnonymously(auth).catch(err => console.error("Auth error:", err));
+        } else {
+            document.getElementById('offline-banner').classList.remove('hidden');
+        }
+
+        // --- 1. Question Data ---
+        const questions = [
+            {
+                q: "What does the 'P' in the fire extinguisher acronym PASS stand for?",
+                options: ["Push the button", "Pull the pin", "Point the nozzle", "Press the handle"],
+                correct: 1,
+                explanation: "PASS stands for: Pull the pin, Aim the nozzle, Squeeze the handle, and Sweep side to side."
+            },
+            {
+                q: "For proper desk ergonomics, where should the top of your computer monitor be?",
+                options: ["At or slightly below eye level", "Above eye level", "Tilted 45 degrees backward", "Resting on the desk surface"],
+                correct: 0,
+                explanation: "The top of the screen should be at or slightly below eye level to prevent neck strain."
+            },
+            {
+                q: "What is the leading cause of slip, trip, and fall accidents in the workplace?",
+                options: ["Poor lighting", "Wet floors and spills", "Running in halls", "Loose carpets"],
+                correct: 1,
+                explanation: "While all are hazards, wet floors and uncleaned spills are the most common cause of slips in the workplace."
+            },
+            {
+                q: "When lifting a heavy box, which part of your body should do most of the work?",
+                options: ["Your lower back", "Your shoulders", "Your legs (knees)", "Your arms"],
+                correct: 2,
+                explanation: "Always bend at your knees and keep your back straight. Let your strong leg muscles do the lifting."
+            },
+            {
+                q: "During a building fire evacuation, what should you NEVER use?",
+                options: ["The stairs", "The emergency exit", "The elevator", "A fire blanket"],
+                correct: 2,
+                explanation: "Elevators can lose power or stop on the floor with the fire. Always use the stairs during a fire alarm."
+            },
+            {
+                q: "How much space must be kept clear in front of an electrical panel?",
+                options: ["At least 1 foot", "At least 3 feet", "None, it's fine if boxes touch it", "At least 10 feet"],
+                correct: 1,
+                explanation: "OSHA requires a minimum clearance of 3 feet in front of electrical panels for safe access during emergencies."
+            },
+            {
+                q: "What is the best immediate first aid for a minor workplace burn?",
+                options: ["Apply butter or oil", "Pop any blisters", "Run cool water over it", "Wrap it tightly in a bandage"],
+                correct: 2,
+                explanation: "Run cool (not freezing cold) water over the burn for 10-15 minutes to soothe the skin and stop the burning process."
+            },
+            {
+                q: "What does PPE stand for?",
+                options: ["Professional Protective Equipment", "Personal Protective Equipment", "Primary Protection Elements", "Personnel Prevention Effort"],
+                correct: 1,
+                explanation: "Personal Protective Equipment includes items like safety glasses, hard hats, gloves, and earplugs."
+            },
+            {
+                q: "To prevent digital eye strain, what is the '20-20-20' rule?",
+                options: ["Blink 20 times every 20 mins", "Every 20 mins, look 20 ft away for 20 secs", "Rest for 20 mins every 20 hours", "Drink 20oz of water every 20 mins"],
+                correct: 1,
+                explanation: "Taking brief screen breaks to look at distant objects allows your eye muscles to relax."
+            },
+            {
+                q: "Where can you find detailed safety information about a chemical used at work?",
+                options: ["The company handbook", "A Wikipedia search", "The Safety Data Sheet (SDS)", "The HR department"],
+                correct: 2,
+                explanation: "Safety Data Sheets (SDS) contain properties of the chemical, hazards, protective measures, and safety precautions."
+            },
+            {
+                q: "Is it safe to plug a power strip directly into another power strip ('daisy-chaining')?",
+                options: ["Yes, if they are the same brand", "Yes, for computers only", "No, it can cause electrical fires", "Only in emergencies"],
+                correct: 2,
+                explanation: "Daisy-chaining overloads the circuits and is a major fire hazard. Power strips must plug directly into a wall outlet."
+            },
+            {
+                q: "When sitting at your desk, how should your feet be positioned?",
+                options: ["Crossed at the ankles", "Tucked under the chair", "Flat on the floor or a footrest", "Dangling freely"],
+                correct: 2,
+                explanation: "Keeping feet flat supports your lower back and promotes good blood circulation in your legs."
+            },
+            {
+                q: "In an active shooter situation, what is the recommended protocol?",
+                options: ["Hide, Cry, Wait", "Run, Hide, Fight", "Stand, Yell, Fight", "Record, Report, Run"],
+                correct: 1,
+                explanation: "Run if you can safely escape. Hide if you cannot run. Fight as an absolute last resort to save your life."
+            },
+            {
+                q: "What should you do if you notice a frayed electrical cord on a piece of office equipment?",
+                options: ["Put electrical tape over it", "Unplug it and report it immediately", "Keep using it if it still works", "Tuck it under a rug"],
+                correct: 1,
+                explanation: "Damaged cords can cause shocks or fires. Never try to repair it yourself with tape; report it so it can be replaced."
+            },
+            {
+                q: "According to general safety rules, when do you need hearing protection?",
+                options: ["If you have to shout to be heard 3 feet away", "Only if it hurts your ears", "Whenever heavy machinery is on", "After 8 hours of work"],
+                correct: 0,
+                explanation: "A good rule of thumb: If you must raise your voice to speak to someone 3 feet away, the noise level requires protection."
+            },
+            {
+                q: "What is a 'Near Miss'?",
+                options: ["An incident that caused a minor injury", "An unplanned event that did not result in injury, but had the potential to do so", "Being late to work", "Missing a safety meeting"],
+                correct: 1,
+                explanation: "Reporting near misses helps companies fix hazards before a real accident actually happens."
+            },
+            {
+                q: "When should 'Wet Floor' signs be removed?",
+                options: ["At the end of the shift", "Immediately after placing them", "When the floor is completely dry", "When a manager says so"],
+                correct: 2,
+                explanation: "Leaving signs out when the floor is dry causes people to ignore them in the future (sign blindness)."
+            },
+            {
+                q: "For adult CPR, what is the correct ratio of chest compressions to rescue breaths?",
+                options: ["15 compressions, 2 breaths", "30 compressions, 2 breaths", "50 compressions, 5 breaths", "Just compressions, no breaths"],
+                correct: 1,
+                explanation: "The standard CPR ratio for adults is 30 chest compressions followed by 2 rescue breaths."
+            },
+            {
+                q: "What is the recommended action to take during an earthquake?",
+                options: ["Run outside immediately", "Stand in a doorway", "Drop, Cover, and Hold On", "Get on the roof"],
+                correct: 2,
+                explanation: "Drop to the floor, take Cover under a sturdy desk or table, and Hold On to it until the shaking stops."
+            },
+            {
+                q: "To effectively remove germs, how long should you wash your hands with soap and water?",
+                options: ["5 seconds", "10 seconds", "20 seconds", "60 seconds"],
+                correct: 2,
+                explanation: "Washing for at least 20 seconds (the time it takes to hum 'Happy Birthday' twice) effectively removes most microbes."
+            }
+        ];
+
+        // --- 2. Game State ---
+        let state = {
+            playerName: '',
+            playerId: '',
+            currentIndex: 0,
+            score: 0,
+            timer: 20,
+            timerInterval: null,
+            isAnswering: false,
+            maxTime: 20
+        };
+
+        // --- Sound & QR Initialization ---
+        // Setup Synthesizers
+        const tickSynth = new Tone.MembraneSynth({ pitchDecay: 0.01, octaves: 1, oscillator: { type: "square" } }).toDestination();
+        const correctSynth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "triangle" } }).toDestination();
+        const wrongSynth = new Tone.Synth({ oscillator: { type: "sawtooth" } }).toDestination();
+        
+        function playTick(isUrgent) {
+            if (Tone.context.state !== 'running') return;
+            if (isUrgent) {
+                tickSynth.triggerAttackRelease("C3", "32n", undefined, 0.8); // Faster, louder tick
+            } else {
+                tickSynth.triggerAttackRelease("G2", "16n", undefined, 0.4); // Normal tick
+            }
+        }
+
+        function playFeedbackSound(isCorrect) {
+            if (Tone.context.state !== 'running') return;
+            if (isCorrect) {
+                correctSynth.triggerAttackRelease(["C4", "E4", "G4", "C5"], "8n");
+            } else {
+                wrongSynth.triggerAttackRelease("C3", "8n");
+                wrongSynth.frequency.rampTo("C2", 0.4);
+            }
+        }
+
+        // Generate QR code for the current URL on load
+        window.addEventListener('DOMContentLoaded', () => {
+            const currentUrl = window.location.href;
+            new QRCode(document.getElementById("qrcode"), {
+                text: currentUrl,
+                width: 140,
+                height: 140,
+                colorDark : "#333333",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.L
+            });
+        });
+
+        const shapes = [
+            '<div class="shape-triangle mx-auto"></div>', 
+            '<div class="shape-diamond mx-auto"></div>', 
+            '<div class="shape-circle mx-auto"></div>', 
+            '<div class="shape-square mx-auto"></div>'
+        ];
+        const bgColors = ['bg-kRed', 'bg-kBlue', 'bg-kYellow', 'bg-kGreen'];
+        const hoverColors = ['hover:bg-red-700', 'hover:bg-blue-700', 'hover:bg-yellow-600', 'hover:bg-green-700'];
+
+        // --- 3. Flow Functions ---
+        async function startGame() {
+            // Activate Audio Context (Required by browsers to allow sound)
+            await Tone.start();
+
+            const idInput = document.getElementById('player-id').value.trim();
+            const nameInput = document.getElementById('player-name').value.trim();
+            if(!idInput || !nameInput) {
+                alert("Please enter both your Employee ID and Nickname to play!");
+                return;
+            }
+            state.playerId = idInput;
+            state.playerName = nameInput;
+            
+            // Randomize questions for replayability
+            questions.sort(() => Math.random() - 0.5);
+
+            document.querySelectorAll('.id-score-display').forEach(el => el.classList.remove('hidden'));
+            
+            hideScreen('screen-home');
+            showReadyScreen();
+        }
+
+        function showReadyScreen() {
+            showScreen('screen-ready');
+            const readyText = document.getElementById('ready-text');
+            readyText.innerText = "Ready...";
+            
+            setTimeout(() => { readyText.innerText = "Set..."; }, 1000);
+            setTimeout(() => { readyText.innerText = "GO!"; }, 2000);
+            setTimeout(() => {
+                hideScreen('screen-ready');
+                loadQuestion();
+            }, 3000);
+        }
+
+        function loadQuestion() {
+            state.isAnswering = true;
+            state.timer = state.maxTime;
+            
+            const q = questions[state.currentIndex];
+            
+            document.getElementById('q-current').innerText = state.currentIndex + 1;
+            document.getElementById('q-total').innerText = questions.length;
+            document.getElementById('question-text').innerText = q.q;
+            
+            const grid = document.getElementById('answers-grid');
+            grid.innerHTML = '';
+
+            // Render buttons
+            q.options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = `${bgColors[index]} ${hoverColors[index]} text-white text-left p-4 md:p-6 rounded-xl shadow-k-btn answer-btn flex items-center gap-4 transition-colors`;
+                btn.onclick = () => submitAnswer(index);
+                
+                btn.innerHTML = `
+                    <div class="w-10 flex-shrink-0 flex items-center justify-center opacity-90">${shapes[index]}</div>
+                    <span class="font-bold text-lg md:text-xl md:leading-tight">${opt}</span>
+                `;
+                grid.appendChild(btn);
+            });
+
+            showScreen('screen-game');
+            startTimer();
+        }
+
+        function startTimer() {
+            const timerText = document.getElementById('timer-text');
+            const timerBar = document.getElementById('timer-bar');
+            
+            timerText.innerText = state.timer;
+            timerBar.style.width = '100%';
+            timerBar.className = "h-full bg-kBlue w-full"; // Reset color
+
+            state.timerInterval = setInterval(() => {
+                state.timer -= 1;
+                timerText.innerText = state.timer;
+                
+                const percent = (state.timer / state.maxTime) * 100;
+                timerBar.style.width = `${percent}%`;
+
+                // Play ticking sound
+                if (state.timer > 0) {
+                    playTick(state.timer <= 5); // Urgent sound for last 5 seconds
+                }
+
+                // Color changes as time runs out
+                if(state.timer <= 10 && state.timer > 5) {
+                    timerBar.className = "h-full bg-kYellow w-full transition-colors";
+                } else if (state.timer <= 5) {
+                    timerBar.className = "h-full bg-kRed w-full transition-colors";
+                    timerText.classList.add('text-kRed', 'pulse-fast');
+                }
+
+                if (state.timer <= 0) {
+                    clearInterval(state.timerInterval);
+                    submitAnswer(-1); // Time out
+                }
+            }, 1000);
+        }
+
+        function submitAnswer(selectedIndex) {
+            if(!state.isAnswering) return;
+            state.isAnswering = false;
+            clearInterval(state.timerInterval);
+            
+            document.getElementById('timer-text').classList.remove('text-kRed', 'pulse-fast');
+
+            const q = questions[state.currentIndex];
+            const isCorrect = selectedIndex === q.correct;
+            
+            // Calculate Points (Kahoot style: 500 max points for answering, + up to 500 for speed)
+            let pointsEarned = 0;
+            if (isCorrect) {
+                const speedBonus = Math.round((state.timer / state.maxTime) * 500);
+                pointsEarned = 500 + speedBonus;
+                state.score += pointsEarned;
+                document.getElementById('nav-score').innerText = state.score;
+            }
+
+            hideScreen('screen-game');
+            showFeedback(isCorrect, pointsEarned, q);
+        }
+
+        function showFeedback(isCorrect, points, questionObj) {
+            playFeedbackSound(isCorrect);
+            
+            const fScreen = document.getElementById('screen-feedback');
+            fScreen.classList.remove('hidden', 'bg-kGreen', 'bg-kRed');
+            fScreen.classList.add(isCorrect ? 'bg-kGreen' : 'bg-kRed');
+            
+            document.getElementById('feedback-icon').innerText = isCorrect ? '✔️' : '❌';
+            document.getElementById('feedback-title').innerText = isCorrect ? 'Correct!' : (points === 0 && state.timer <= 0) ? 'Time Up!' : 'Incorrect';
+            
+            const pText = document.getElementById('feedback-points');
+            pText.innerText = isCorrect ? `+ ${points}` : '0';
+            
+            document.getElementById('feedback-correct-answer').innerText = questionObj.options[questionObj.correct];
+            document.getElementById('feedback-explanation').innerText = questionObj.explanation;
+            
+            fScreen.classList.add('slide-up');
+        }
+
+        function nextQuestion() {
+            hideScreen('screen-feedback');
+            state.currentIndex++;
+            
+            if (state.currentIndex >= questions.length) {
+                showPodium();
+            } else {
+                loadQuestion();
+            }
+        }
+
+        function showPodium() {
+            showScreen('screen-podium');
+            document.getElementById('podium-name').innerText = state.playerName;
+            
+            // Animate Score Counting up
+            let currentDisplayScore = 0;
+            const targetScore = state.score;
+            const scoreEl = document.getElementById('podium-score');
+            const inc = targetScore / 50;
+            
+            const counter = setInterval(() => {
+                currentDisplayScore += inc;
+                if(currentDisplayScore >= targetScore) {
+                    scoreEl.innerText = targetScore;
+                    clearInterval(counter);
+                    triggerConfetti();
+                } else {
+                    scoreEl.innerText = Math.round(currentDisplayScore);
+                }
+            }, 20);
+
+            // Set final message based on performance
+            const maxPossible = questions.length * 1000;
+            const percentage = state.score / maxPossible;
+            const msgEl = document.getElementById('podium-message');
+            
+            if (percentage > 0.8) {
+                msgEl.innerText = "Incredible! You are a Workplace Safety Champion! 🥇";
+            } else if (percentage > 0.5) {
+                msgEl.innerText = "Great job! You have a solid grasp on safety basics. 👍";
+            } else {
+                msgEl.innerText = "Good effort! Review the safety guidelines and try again! 📚";
+            }
+
+            saveAndLoadLeaderboard();
+        }
+
+        async function saveAndLoadLeaderboard() {
+            const lbList = document.getElementById('live-leaderboard');
+            
+            if (!isCloudEnabled || !auth.currentUser) {
+                lbList.innerHTML = `<li class="text-amber-600 text-center py-4 font-bold">Offline Mode: Leaderboard Unavailable</li>`;
+                return;
+            }
+
+            try {
+                // Save current user score to the Cloud
+                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'quiz_leaderboard', auth.currentUser.uid);
+                
+                // Fetch existing to see if this score is a new high score
+                await setDoc(userRef, {
+                    name: state.playerName,
+                    employeeId: state.playerId,
+                    score: state.score,
+                    timestamp: new Date().toISOString()
+                }, { merge: true });
+
+                // Load Leaderboard Data
+                const qCol = collection(db, 'artifacts', appId, 'public', 'data', 'quiz_leaderboard');
+                const snapshot = await getDocs(qCol);
+                
+                let scores = [];
+                snapshot.forEach(docSnap => scores.push(docSnap.data()));
+                
+                // Sort descending in memory
+                scores.sort((a, b) => b.score - a.score);
+                
+                lbList.innerHTML = '';
+                const top10 = scores.slice(0, 10);
+                
+                if (top10.length === 0) {
+                    lbList.innerHTML = `<li class="text-gray-500 text-center py-4">No scores yet!</li>`;
+                    return;
+                }
+
+                top10.forEach((s, i) => {
+                    const isMe = s.name === state.playerName && s.score === state.score;
+                    const rankIcon = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+                    lbList.innerHTML += `
+                        <li class="flex justify-between items-center p-3 rounded-lg ${isMe ? 'bg-blue-50 border border-blue-200 shadow-sm' : 'bg-gray-50 border border-transparent'}">
+                            <div class="flex items-center gap-3">
+                                <span class="font-black w-6 text-center text-gray-500">${rankIcon}</span>
+                                <span class="font-bold text-kDark text-lg">${s.name} <span class="text-xs font-normal text-gray-400">(${s.employeeId || 'N/A'})</span></span>
+                                ${isMe ? '<span class="text-[10px] bg-kBlue text-white px-2 py-0.5 rounded-full font-bold">YOU</span>' : ''}
+                            </div>
+                            <div class="font-black text-kBlue text-lg">${s.score} <span class="text-xs text-gray-500 uppercase">pts</span></div>
+                        </li>
+                    `;
+                });
+            } catch (e) {
+                console.error("Error with leaderboard:", e);
+                lbList.innerHTML = `<li class="text-red-500 text-center py-4 font-bold">Error loading leaderboard</li>`;
+            }
+        }
+
+        async function exportReport() {
+            if (!isCloudEnabled || !auth.currentUser) {
+                alert("Offline Mode: Cannot extract report without cloud connection.");
+                return;
+            }
+            
+            try {
+                // Fetch all scores
+                const qCol = collection(db, 'artifacts', appId, 'public', 'data', 'quiz_leaderboard');
+                const snapshot = await getDocs(qCol);
+                
+                let scores = [];
+                snapshot.forEach(docSnap => scores.push(docSnap.data()));
+                
+                // Sort descending by score
+                scores.sort((a, b) => b.score - a.score);
+                
+                // Build CSV
+                let csvContent = "data:text/csv;charset=utf-8,";
+                csvContent += "Rank,Employee ID,Nickname,Total Score,Date Completed\r\n";
+                
+                scores.forEach((s, index) => {
+                    const dateStr = s.timestamp ? new Date(s.timestamp).toLocaleString() : 'N/A';
+                    csvContent += `${index + 1},"${s.employeeId || 'N/A'}","${s.name}",${s.score},"${dateStr}"\r\n`;
+                });
+
+                // Trigger Download
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "Safety_Quiz_Leaderboard_Report.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+            } catch(e) {
+                console.error("Export error:", e);
+                alert("Failed to export report. Check console for details.");
+            }
+        }
+
+        function triggerConfetti() {
+            const duration = 3 * 1000;
+            const animationEnd = Date.now() + duration;
+            const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
+
+            function randomInRange(min, max) {
+                return Math.random() * (max - min) + min;
+            }
+
+            const interval = setInterval(function() {
+                const timeLeft = animationEnd - Date.now();
+
+                if (timeLeft <= 0) {
+                    return clearInterval(interval);
+                }
+
+                const particleCount = 50 * (timeLeft / duration);
+                confetti(Object.assign({}, defaults, { particleCount,
+                    origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
+                }));
+                confetti(Object.assign({}, defaults, { particleCount,
+                    origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
+                }));
+            }, 250);
+        }
+
+        function playAgain() {
+            // Reset state
+            state.currentIndex = 0;
+            state.score = 0;
+            state.isAnswering = false;
+            document.getElementById('nav-score').innerText = '0';
+            
+            // Go back to ready screen
+            hideScreen('screen-podium');
+            showReadyScreen();
+        }
+
+        // --- Helper Utilities ---
+        function hideScreen(id) {
+            const el = document.getElementById(id);
+            el.classList.add('hidden');
+            el.classList.remove('slide-up', 'fade-in');
+        }
+        function showScreen(id) {
+            const el = document.getElementById(id);
+            el.classList.remove('hidden');
+        }
+
+    </script>
+</body>
+</html>
